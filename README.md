@@ -40,14 +40,14 @@ This Inventory Management System is designed with Object-Oriented Programming pr
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/inventory-management-oop.git
+   git clone https://github.com/Gamer997/inventory-management-oop.git
    cd inventory-management-oop
 
 g++ main.cpp -o inventory
 ./inventory
 
 ## Example installation commands
-git clone https://github.com/yourusername/inventory-management-oop.git
+git clone https://github.com/Gamer997/inventory-management-oop.git
 cd inventory-management-oop
 g++ main.cpp -o inventory
 
