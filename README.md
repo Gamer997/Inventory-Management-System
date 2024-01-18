@@ -2,6 +2,7 @@
 
 A comprehensive Inventory Management System implemented using Object-Oriented Programming (OOP) concepts in C++. The system allows both administrators and customers to interact with the inventory, manage users, and perform various operations.
 
+
 ## Table of Contents
 
 - [Introduction](#introduction)
