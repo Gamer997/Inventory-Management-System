@@ -349,7 +349,61 @@ User* authenticateUser(const string& username, const string& password, const vec
     }
     return nullptr;
 }
+void placeOrder(const string& username, Inventory& inventory, vector<User>& users) {
+    int productId, quantity;
+    string category, productName;
+    inventory.loadInventoryFromFile("inventory.csv");
 
+    // Display available products
+    inventory.printProduct();
+
+    cout << "Enter the ID of the product you want to order: ";
+    cin >> productId;
+
+    // Find the product in the inventory
+    Product* product = inventory.findProduct(productId);
+
+    if (product != nullptr) {
+        cout << "Enter the quantity you want to order: ";
+        cin >> quantity;
+
+        // Check if there is enough quantity in the inventory
+        if (quantity > 0 && quantity <= product->getQuantity()) {
+            // Get the category and name of the product
+            category = product->getCategory();
+            productName = product->getName();
+
+            // Update the quantity in the inventory
+            product->setQuantity(product->getQuantity() - quantity);
+
+            // Write the order to the CSV file
+            ofstream orderFile("orders.csv", ios::out | ios::app);
+
+            if (orderFile.is_open()) {
+                orderFile << productId << "," << productName << "," << category << "," << product->getPrice() << "," << quantity << "," << username << endl;
+                orderFile.close();
+                cout << "Order placed successfully!" << endl;
+
+                // Update the user's order history
+                for (auto& user : users) {
+                    if (user.getName() == username) {
+                        user.orderHistory.push_back(Order(productId, productName, category, product->getPrice(), quantity));
+                        break;
+                    }
+                }
+            }
+            else {
+                cout << "Error: Could not open orders file." << endl;
+            }
+        }
+        else {
+            cout << "Invalid quantity or insufficient stock." << endl;
+        }
+    }
+    else {
+        cout << "Product not found." << endl;
+    }
+}
 
 void showOrderHistory(const User& user) {
     cout << "-----------------------------------------------------------" << endl;
@@ -372,6 +426,81 @@ void showOrderHistory(const User& user) {
 
     cout << "-----------------------------------------------------------" << endl;
 }
+
+struct Order_History {
+    int quantity;
+    std::string itemName;
+    std::string itemType;
+    int itemPrice;
+    int customerQuantity;
+    std::string customerName;
+};
+
+void displayOrders(const std::vector<Order_History>& orders) {
+    if (orders.empty()) {
+        std::cout << "No orders found for the specified customer." << std::endl;
+        return;
+    }
+
+    std::cout << "--------------------------------------------------------------------------------" << std::endl;
+    std::cout << std::setw(10) << "ID" << std::setw(20) << "Item Name" << std::setw(15) << "Item Type"
+        << std::setw(15) << "Item Price" << std::setw(20) << "Customer Quantity" << std::endl;
+    std::cout << "--------------------------------------------------------------------------------" << std::endl;
+
+    for (const auto& order : orders) {
+        std::cout << std::setw(10) << order.quantity
+            << std::setw(20) << order.itemName
+            << std::setw(15) << order.itemType
+            << std::setw(15) << order.itemPrice
+            << std::setw(20) << order.customerQuantity << std::endl;
+        std::cout << "--------------------------------------------------------------------------------" << std::endl;
+    }
+}
+
+void showOrderHistory(const std::string& customerName, const std::string& inputFile) {
+    std::ifstream file(inputFile);
+
+    if (!file.is_open()) {
+        std::cerr << "Error: Unable to open file " << inputFile << std::endl;
+        return;
+    }
+
+    std::vector<Order_History> customerOrders;
+
+    // Skip the header line
+    std::string line;
+    std::getline(file, line);
+
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        Order_History order;
+
+        // Tokenize the line using comma as the delimiter
+        std::string token;
+        std::getline(iss, token, ',');
+        order.quantity = std::stoi(token);
+
+        std::getline(iss, order.itemName, ',');
+        std::getline(iss, order.itemType, ',');
+        std::getline(iss, token, ',');
+        order.itemPrice = std::stoi(token);
+        std::getline(iss, token, ',');
+        order.customerQuantity = std::stoi(token);
+        std::getline(iss, order.customerName, ',');
+
+        if (order.customerName == customerName) {
+            // Store order details in the vector
+            customerOrders.push_back(order);
+        }
+    }
+
+    file.close();
+
+    // Display order details
+    displayOrders(customerOrders);
+}
+
+
 
 void placeOrder(Inventory& inventory_) {
     int productId, quantity;
@@ -515,9 +644,11 @@ void manageInventory(Inventory& inventory) {
             cout << "Enter ID: ";
             cin >> id;
             cout << "Enter product name: ";
-            cin >> name;
+            cin.ignore();
+            getline(cin, name);
             cout << "Enter product category: ";
-            cin >> category;
+            
+            getline(cin, category);
             cout << "Enter product price: $ ";
             cin >> price;
             cout << "Enter product quantity: ";
@@ -606,41 +737,77 @@ void manageInventory(Inventory& inventory) {
     } while (true);
 }
 
+void showOrderHistory(const string& username) {
+    cout << "-----------------------------------------------------------" << endl;
+    cout << "--------------- Order History for " << username << " ---------------" << endl;
+    cout << "-----------------------------------------------------------" << endl;
+
+    ifstream ordersFile("orders.csv");
+
+    if (ordersFile.is_open()) {
+        string line;
+        cout << left << setw(10) << "Quantity" << setw(20) << "Item Name" << setw(15) << "Item Type"
+            << setw(10) << "Item Price" << setw(10) << "Costumer" << endl;
+        cout << "-----------------------------------------------------------" << endl;
+
+        while (getline(ordersFile, line)) {
+            stringstream ss(line);
+            string quantityStr, productName, category, priceStr, customer;
+            getline(ss, quantityStr, ',');
+            getline(ss, productName, ',');
+            getline(ss, category, ',');
+            getline(ss, priceStr, ',');
+            getline(ss, customer, ',');
+
+            int quantity = stoi(quantityStr);
+            double price = stod(priceStr);
+
+            if (customer == username) {
+                cout << left << setw(10) << quantity << setw(20) << productName
+                    << setw(15) << category << setw(10) << "$" << fixed << setprecision(2) << price
+                    << setw(10) << customer << endl;
+            }
+        }
+
+        ordersFile.close();
+    }
+    else {
+        cout << "Error: Could not open orders file." << endl;
+    }
+
+    cout << "-----------------------------------------------------------" << endl;
+}
 
 int main() {
     vector<User> users;
     const string userFilename = "users.txt";
-
+    string csv_file_orders = "orders.csv";
     // Load user data from file
     loadUserData(users, userFilename);
 
+
+cout << R"(
+ ___                                                                 _____ 
+(___)                                                               (_____)
+|   |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|   | 
+|   |  ___                      _                                    |   | 
+|   | |_ _|_ ____   _____ _ __ | |_ ___  _ __ _   _                  |   | 
+|   |  | || '_ \ \ / / _ \ '_ \| __/ _ \| '__| | | |                 |   | 
+|   |  | || | | \ V /  __/ | | | || (_) | |  | |_| |                 |   | 
+|   | |___|_| |_|\_/ \___|_| |_|\__\___/|_|   \__, |            _    |   | 
+|   | |  \/  | __ _ _ __   __ _  __ _  ___ _ _|___/   ___ _ __ | |_  |   | 
+|   | | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '_ ` _ \ / _ \ '_ \| __| |   | 
+|   | | |  | | (_| | | | | (_| | (_| |  __/ | | | | |  __/ | | | |_  |   | 
+|   | |_|__|_|\__,_|_| |_|\__,_|\__, |\___|_| |_| |_|\___|_| |_|\__| |   | 
+|   | / ___| _   _ ___| |_ ___ _|___/__                              |   | 
+|   | \___ \| | | / __| __/ _ \ '_ ` _ \                             |   | 
+|   |  ___) | |_| \__ \ ||  __/ | | | | |                            |   | 
+|   | |____/ \__, |___/\__\___|_| |_| |_|                            |   | 
+|   |        |___/                                                   |   | 
+|___|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|___| 
+(___)                                                               (_____)
+)" << endl;
     
-    cout << ".--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--.." << endl;
-    cout << "/ .. \\\\.. \\\\.. \\\\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\";
-    cout << "\\ \\/\\\\ `'\\\\ `'\\\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ `'\\ \\/ /" << endl;
-    cout << " \\/ /`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'\\/ / " << endl;
-    cout << " / /\\                                                                            / /\\ " << endl;
-    cout << "/ /\\ \\  __ __  __ __ __  ____ __  __ ______   ___   ____  _  _                  / /\\ \\" << endl;
-    cout << "\\ \\/ /  || ||\\ || || || ||    ||\\ || | || |  // \\\\  || \\\\ \\\\//                  \\ \\/ /" << endl;
-    cout << " \\/ /   || ||\\\\|| \\\\ // ||==  ||\\\\||   ||   ((   )) ||_//  )/                    \\/ / " << endl;
-    cout << " / /\\   || || \\||  \\V/  ||___ || \\||   ||    \\\\_/  || \\\\ \\\\ //                     / /\\ " << endl;
-    cout << "/ /\\ \\                                                                          / /\\ \\" << endl;
-    cout << "\\ \\/ /  ___  ___  ___  __  __  ___    ___   ____ ___  ___  ____ __  __ ______   \\ \\/ /" << endl;
-    cout << " \\/ /   ||||\\ || || || ||    ||\\ || | || |  // \\\\  || \\\\ \\\\//                  \\/ / " << endl;
-    cout << " / /\\   ||| \\/ || || || ||==  || \\\\|   ||   ((   )) || || )/                    / /\\ " << endl;
-    cout << "/ /\\ \\  ||    || || || || \\|| || ||    ||    \\\\_/  || || \\\\                     / /\\ \\" << endl;
-    cout << "\\ \\/ /                                                                          \\ \\/ /" << endl;
-    cout << " \\/ /    __  _  _  __  ______  ____ ___  ___                                     \\/ / " << endl;
-    cout << " / /\\   (( \\ \\\\// (( \\ | || | ||    ||\\\\//||                                     / /\\ " << endl;
-    cout << "/ /\\ \\   \\\\   )/   \\\\    ||   ||==  || \\/ ||                                    / /\\ \\" << endl;
-    cout << "\\ \\/ /   \\_)) //   \\_))   ||   ||___ ||    ||                                    \\ \\/ /" << endl;
-    cout << " \\/ /                                                                            \\/ / " << endl;
-    cout << " / /\\.--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--. / /\\ " << endl;
-    cout << "/ /\\ \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\.. \\/ /" << endl;
-    cout << "\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `\\'`\\ `' /" << endl;
-    cout << " `--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'";
-
-
 
     char choice;
     do {
@@ -663,12 +830,12 @@ int main() {
             Inventory inv_1;
             if (currentUser != nullptr) {
                 // User authenticated, display menu based on user type
-                while (choice != 'Q' && choice != 'q')
+                while (choice != 'Q' )
                 {
                     cout << "Please choose an option:" << endl;
                     if (currentUser->getType() == "Admin") {
-                        cout << "***********************" << endl;
-                        cout << "\n[1] Manage Inventory" << endl;
+                        cout << "\n***********************" << endl;
+                        cout << "[1] Manage Inventory" << endl;
                         cout << "[2] View All Users" << endl;
                         cout << "[Q] Exit to login Page" << endl;
                         cout << "**************************" << endl<<endl;
@@ -704,8 +871,8 @@ int main() {
                         switch (choice) {
                             // Handle menu options based on user type
                         case '1':
-                            cout << "case 3" << endl;
-                            placeOrder(v1);
+                            
+                            placeOrder(username, inv_1, users);
 
                             break;
                         case '2':
@@ -714,7 +881,8 @@ int main() {
                             break;
                         case '3':
                             cout << "Order History" << endl;
-                            showOrderHistory(*currentUser);
+
+                            showOrderHistory(username, csv_file_orders);
                             break;
                         default:
                             cout << "Invalid input\n";
@@ -728,9 +896,7 @@ int main() {
                     
 
 
-                } 
-                /*while (choice != 'Q' && choice != 'q');*/
-
+}    
                 // Deallocate memory for the current user object
                 delete currentUser;
             }
@@ -750,7 +916,7 @@ int main() {
 
         case 'q':
         case 'Q':
-            cout << "Goodbye!" << endl;
+            cout << "Thanks for using our Program! Good Bye!" << endl;
             return 0;
 
         default:
